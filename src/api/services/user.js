@@ -1,4 +1,4 @@
-import User from "../model/User.js"; // Updated path for consistency
+import User from "../model/user.js"
 import jwt from "jsonwebtoken";
 import bcrypt from "bcrypt";
 import dotenv from "dotenv";
