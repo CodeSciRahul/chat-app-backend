@@ -11,4 +11,6 @@ const userSchema = new mongoose.Schema({
   linkedinId: { type: String, default: null }, // For LinkedIn login
 }, { timestamps: true });
 
-export default mongoose.model('User', userSchema);
+const User = mongoose.models.User || mongoose.model('User', userSchema);
+
+export default User;

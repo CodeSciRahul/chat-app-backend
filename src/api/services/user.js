@@ -59,6 +59,7 @@ export const register = async (req, res) => {
     }
 };
 
+//verify Email
 export const verifyEmail = async (req, res) => {
     const { token } = req.query;
 
@@ -139,3 +140,16 @@ export const login = async (req, res) => {
         });
     }
 };
+
+//all users
+export const allUsers = async (req, res) => {
+    try {
+      const users = await User.find();
+      res.status(200).send({
+        users
+      });
+    } catch (error) {
+      console.error('Error fetching users:', error);
+      res.status(500).json({ message: 'Internal Server Error' });
+    }
+  };

@@ -10,7 +10,8 @@ export const chatMessage = async(req,res) => {
                 { sender, receiver },
                 { sender: receiver, receiver: sender },
             ],
-        }).sort({ timestamp: 1 });
+        }).sort({ timestamp: 1 }).populate('sender', 'name email') // Only populate sender's name and email (adjust fields as needed)
+        .populate('receiver', 'name email');;
         res.status(200).json(messages);
     } catch (error) {
         res.status(500).send({ message: error.message });
@@ -20,6 +21,7 @@ export const chatMessage = async(req,res) => {
 export const uploadDocument = async (req, res) => {
     try {
         const { sender, receiver} = req.body;
+        console.log(sender, receiver)
 
       const file = req.file;
       if (!file) {
@@ -28,6 +30,7 @@ export const uploadDocument = async (req, res) => {
         
       const fileName = file.originalname;
       const fileType = file.mimetype;
+      console.log(fileName, fileType)
   
       // Upload to AWS S3.
       const fileUrl = await uploadFileToAws(file.buffer, fileName, fileType);
