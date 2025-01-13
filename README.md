@@ -58,10 +58,10 @@ PORT=your_server_port
 - Email_Verification_Secret_key=your_email_verification_secret_key
 
 ## Getting Started
-### .Run following cmd. 
+### Run following cmd to install use repo. 
 ```bash
 git clone https://github.com/CodeSciRahul/chat-app-backend.git
 npm install
-nodemon server
+nodemon server.js
 
 
