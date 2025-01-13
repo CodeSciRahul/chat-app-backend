@@ -42,20 +42,20 @@ MONGO_URL=your_mongodb_connection_string
 PORT=your_server_port
 
 # Security Configuration
-SALT_ROUND=your_salt_round_number
-SECRET_KEY=your_secret_key
+- SALT_ROUND=your_salt_round_number
+- SECRET_KEY=your_secret_key
 
 # AWS S3 Configuration
-Access_key=your_aws_access_key
-S3_Secret_key=your_aws_s3_secret_key
-Bucket_Name=your_s3_bucket_name
-Region=your_aws_region
+- Access_key=your_aws_access_key
+- S3_Secret_key=your_aws_s3_secret_key
+- Bucket_Name=your_s3_bucket_name
+- Region=your_aws_region
 
 # Email Configuration
-App_password=your_email_app_password
-Sender_email=your_email_address
-Frontend_url=your_frontend_url
-Email_Verification_Secret_key=your_email_verification_secret_key
+- App_password=your_email_app_password
+- Sender_email=your_email_address
+- Frontend_url=your_frontend_url
+- Email_Verification_Secret_key=your_email_verification_secret_key
 
 ## Getting Started
 ### .Run following cmd. 
