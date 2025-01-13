@@ -2,7 +2,7 @@ import mongoose from "mongoose";
 
 const connectDB = async(mongoUrl) => {
     const db_config_object = { 
-        // ssl: true, 
+        ssl: true, 
     };
     mongoose
     .connect(mongoUrl, db_config_object)
