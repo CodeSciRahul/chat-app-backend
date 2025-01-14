@@ -39,8 +39,13 @@ export const uploadDocument = async (req, res) => {
       const newMessage = new Message({ sender, receiver, fileUrl, fileType });
       await newMessage.save();
 
-      io.to(receiver).emit('receive_message', newMessage); // Emit to receiver in real time
-      res.status(200).send(newMessage);
+   const populatedMessage = await Message.findById(newMessage._id)
+      .populate("sender", "name email")
+      .populate("receiver", "name email");
+
+    const room = [sender, receiver].sort().join("_");
+    io.to(room).emit("receive_message", populatedMessage);     
+        res.status(200).send(newMessage);
     } catch (error) {
       return res.status(500).send({ message: error.message });
     }
