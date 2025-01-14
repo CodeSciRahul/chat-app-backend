@@ -77,6 +77,11 @@ io.on("connection", (socket) => {
     });
     await newMessage.save();
 
+    // Populate sender and receiver details
+    const populatedMessage = await Message.findById(newMessage._id)
+      .populate("sender", "name email")
+      .populate("receiver", "name email");
+
     // Check if a conversation already exists
     let conversation = await Conversation.findOne({
       userId: senderId,
@@ -91,7 +96,7 @@ io.on("connection", (socket) => {
     }
 
     // Emit the message to the room
-    io.to(room).emit("receive_message", newMessage);
+    io.to(room).emit("receive_message", populatedMessage);
   });
 
   socket.on("disconnect", () => {
