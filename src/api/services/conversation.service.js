@@ -1,10 +1,15 @@
-import Conversation from "../model/receiver.js"
-import User from "../model/user.js"
+import {
+    findConversationsByUserIdWithPopulate,
+    findUserByEmailOrMobile,
+    findConversationByUserIdAndParticipant,
+    createConversation,
+    removeParticipantFromConversation
+} from "../../database/operations/index.js";
 export const Participents = async (req, res) => {
     const { userId } = req.user;
 
     try {
-        const conversations = await Conversation.find({ userId }).populate('participants', '_id name email mobile');
+        const conversations = await findConversationsByUserIdWithPopulate(userId);
         if (!conversations) {
             return res.status(404).json({ message: 'No conversations found' });
         }
@@ -26,17 +31,16 @@ export const addParticipents = async (req, res) => {
 
     try {
         // Find the receiver by email or mobile
-        const receiver = await User.findOne({ $or: [{ email }, { mobile }] });
+        const receiver = await findUserByEmailOrMobile(email, mobile);
 
         if (!receiver) {
             return res.status(404).json({ message: 'Receiver not found' });
         }
 
         // Check if a conversation already exists
-        let conversation = await Conversation.findOne({ userId, participants: receiver._id });
+        let conversation = await findConversationByUserIdAndParticipant(userId, receiver._id);
         if (!conversation) {
-            conversation = new Conversation({ userId, participants: [receiver._id] });
-            await conversation.save();
+            conversation = await createConversation({ userId, participants: [receiver._id] });
         }
 
         res.status(201).json({ message: 'Receiver added successfully', conversation });
@@ -51,11 +55,7 @@ export const deleteParticipents = async (req, res) => {
     const {userId} = req.user
 
     try {
-        const conversation = await Conversation.findOneAndUpdate(
-            { userId },
-            { $pull: { participants: receiverId } },
-            { new: true } // Return the updated document
-        );
+        const conversation = await removeParticipantFromConversation(userId, receiverId);
 
         if (!conversation) {
             return res.status(404).json({ message: 'Conversation not found' });

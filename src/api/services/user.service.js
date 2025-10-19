@@ -1,13 +1,19 @@
-import User from "../model/user.js"
 import jwt from "jsonwebtoken";
-import bcrypt from "bcrypt";
 import dotenv from "dotenv";
 import properties from "../../config/properties.js";
-import {sendEmail} from "../../util/sendEmail.js"
+import {sendEmail} from "../../util/sendEmail.js";
+import {
+    createUser,
+    findUserByEmailOrMobile,
+    findUserByEmail,
+    updateUserVerificationStatus,
+    comparePassword,
+    excludePasswordFromUser,
+    findAllUsers
+} from "../../database/operations/user.operation.js";
 
 dotenv.config();
 
-const SALT_ROUND = properties?.SALT_ROUND || 10;
 const SECRET_KEY = properties?.SECERT_KEY;
 
 // Register User with Email Verification
@@ -21,28 +27,21 @@ export const register = async (req, res) => {
         }
 
         // Check if email or mobile already exists
-        const existingUser = await User.findOne({
-            $or: [{ email }, { mobile }],
-        });
+        const existingUser = await findUserByEmailOrMobile(email, mobile);
         if (existingUser) {
             return res.status(400).send({
                 message: "Email or Mobile number already registered",
             });
         }
 
-        // Hash the password
-        const hashedPassword = await bcrypt.hash(password, SALT_ROUND);
-
         // Create a new user (not yet verified)
-        const newUser = new User({
+        const savedUser = await createUser({
             name,
             email,
             mobile,
-            password: hashedPassword,
-            isVerified: false, // Add this field in your schema
+            password,
+            isVerified: false
         });
-
-        const savedUser = await newUser.save();
 
         // Send verification email
         const emailResult = await sendEmail(email);
@@ -72,7 +71,7 @@ export const verifyEmail = async (req, res) => {
         const decoded = jwt.verify(token, process.env.Email_Verification_Secret_key);
 
         // Update the user's verification status
-        const user = await User.findOne({ email: decoded.receiver_mail });
+        const user = await findUserByEmail(decoded.receiver_mail);
         if (!user) {
             return res.status(404).send({ message: "User not found" });
         }
@@ -81,8 +80,7 @@ export const verifyEmail = async (req, res) => {
             return res.status(400).send({ message: "User is already verified" });
         }
 
-        user.isVerified = true;
-        await user.save();
+        await updateUserVerificationStatus(decoded.receiver_mail, true);
 
         return res.status(200).send({ message: "Email verified successfully" });
     } catch (error) {
@@ -103,7 +101,7 @@ export const login = async (req, res) => {
         }
 
         // Check if the user exists
-        const user = await User.findOne({ email });
+        const user = await findUserByEmail(email);
         if (!user) {
             return res.status(400).send({
                 message: "Invalid email or password",
@@ -111,7 +109,7 @@ export const login = async (req, res) => {
         }
 
         // Verify password
-        const isPasswordValid = await bcrypt.compare(password, user.password);
+        const isPasswordValid = await comparePassword(password, user.password);
         if (!isPasswordValid) {
             return res.status(400).send({
                 message: "Invalid email or password",
@@ -125,8 +123,7 @@ export const login = async (req, res) => {
         const token = jwt.sign(payload, SECRET_KEY, { expiresIn: "48h" });
 
         // Exclude password from the response
-        const userWithoutPassword = user.toObject();
-        delete userWithoutPassword.password;
+        const userWithoutPassword = excludePasswordFromUser(user);
 
         // Send response
         return res.status(200).send({
@@ -144,7 +141,7 @@ export const login = async (req, res) => {
 //all users
 export const allUsers = async (req, res) => {
     try {
-      const users = await User.find();
+      const users = await findAllUsers();
       res.status(200).send({
         users
       });
@@ -152,4 +149,4 @@ export const allUsers = async (req, res) => {
       console.error('Error fetching users:', error);
       res.status(500).json({ message: 'Internal Server Error' });
     }
-  };
+};
