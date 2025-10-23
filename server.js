@@ -11,7 +11,8 @@ import { upload } from "./src/api/middlewares/handleFile.js";
 import { 
   createMessage, 
   findMessageByIdWithPopulate, 
-  addReactionToMessage 
+  addReactionToMessage,
+  removeReactionFromMessage
 } from "./src/database/operations/message.operation.js";
 import { 
   createConversation, 
@@ -87,7 +88,7 @@ io.on("connection", (socket) => {
   });
 
   // Handle sending private messages
-  socket.on("send_message", async ({ senderId, receiverId, content, fileUrl, fileType }) => {
+  socket.on("send_message", async ({ senderId, receiverId, content, fileUrl, fileType, replyTo }) => {
     try {
       const room = [senderId, receiverId].sort().join("_");
 
@@ -98,7 +99,8 @@ io.on("connection", (socket) => {
         content,
         fileUrl,
         fileType,
-        messageType: "private"
+        messageType: "private",
+        replyTo
       };
       
       const newMessage = await createMessage(messageData);
@@ -151,10 +153,11 @@ io.on("connection", (socket) => {
   });
 
   // Handle message reactions
-  socket.on("add_reaction", async ({ messageId, userId, emoji, groupId }) => {
+  socket.on("add_reaction", async ({ messageId, userId, emoji, groupId = null}) => {
     try {
       // Use database operations for adding reaction
       const message = await addReactionToMessage(messageId, userId, emoji);
+      console.log("message", message);
 
       if (groupId) {
         io.to(`group_${groupId}`).emit("message_reaction_added", message);
@@ -168,6 +171,23 @@ io.on("connection", (socket) => {
       socket.emit("error", { message: "Failed to add reaction" });
     }
   });
+
+  socket.on("remove_reaction", async ({ messageId, reactionId}) => {
+    try {
+      const message = await removeReactionFromMessage(messageId, reactionId);
+      console.log("remove reaction message", message);
+      if (message.messageType === "group") {
+        io.to(`group_${message.groupId}`).emit("message_reaction_removed", message);
+      } else {
+        const room = [message.sender._id, message.receiver].sort().join("_");
+        io.to(room).emit("message_reaction_removed", message);
+      }  
+    } catch (error) {
+        console.error("Error removing reaction:", error);
+        socket.emit("error", { message: "Failed to remove reaction" });
+      }
+    }
+  );
 
   // Handle member added to group
   socket.on("group_member_added", ({ groupId, newMember }) => {

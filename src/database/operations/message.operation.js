@@ -15,8 +15,9 @@ export const createMessage = async (messageData) => {
             messageType,
             replyTo
         });
-        
-        return await newMessage.save();
+        const savedMessage = await newMessage.save();
+        console.log("savedMessage", savedMessage);
+        return savedMessage;
     } catch (error) {
         throw new Error(`Failed to create message: ${error.message}`);
     }
@@ -38,23 +39,58 @@ export const findMessagesBySenderAndReceiver = async (sender, receiver) => {
                 { sender, receiver },
                 { sender: receiver, receiver: sender }
             ]
-        }).sort({ timestamp: 1 });
+        }).sort({ createdAt: 1 });
     } catch (error) {
         throw new Error(`Failed to find messages by sender and receiver: ${error.message}`);
     }
 };
 
-export const findMessagesBySenderAndReceiverWithPopulate = async (sender, receiver) => {
+export const fetchMessages = async (sender, receiver, groupId) => {
     try {
-        return await Message.find({
-            $or: [
+        const query = {};
+        if(groupId){
+            query.groupId = groupId;
+        } else {
+            query.$or = [
                 { sender, receiver },
                 { sender: receiver, receiver: sender }
-            ]
-        })
-        .sort({ timestamp: 1 })
-        .populate('sender', 'name email')
-        .populate('receiver', 'name email');
+            ];
+        }        
+        const messageQuery = Message.find(query).sort({ createdAt: 1 });
+        
+        // Conditionally populate based on context
+        if (groupId) {
+            // For group messages, populate sender, replyTo, reactions, and groupId
+            messageQuery
+                .populate('sender', 'name email')
+                .populate({
+                    path: 'replyTo',
+                    populate: [
+                        { path: 'sender', select: 'name email' },
+                        { path: 'receiver', select: 'name email' },
+                        { path: 'groupId', select: 'name' },
+                        { path: 'reactions.user', select: 'name email' }
+                    ]
+                })
+                .populate('reactions.user', 'name email')
+                .populate('groupId', 'name');
+        } else {
+            // For private messages, populate sender, receiver, replyTo, and reactions
+            messageQuery
+                .populate('sender', 'name email')
+                .populate('receiver', 'name email')
+                .populate({
+                    path: 'replyTo',
+                    populate: [
+                        { path: 'sender', select: 'name email' },
+                        { path: 'receiver', select: 'name email' },
+                        { path: 'reactions.user', select: 'name email' }
+                    ]
+                })
+                .populate('reactions.user', 'name email');
+        }
+        
+        return await messageQuery.exec();
     } catch (error) {
         throw new Error(`Failed to find messages with populate: ${error.message}`);
     }
@@ -189,13 +225,13 @@ export const addReactionToMessage = async (messageId, userId, emoji) => {
     }
 };
 
-export const removeReactionFromMessage = async (messageId, userId) => {
+export const removeReactionFromMessage = async (messageId, reactionId) => {
     try {
         return await Message.findByIdAndUpdate(
             messageId,
             {
                 $pull: {
-                    reactions: { user: userId }
+                    reactions: { _id: reactionId }
                 }
             },
             { new: true }

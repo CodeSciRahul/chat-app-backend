@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { Participents,addParticipents,deleteParticipents } from "../services/conversation.js";
+import { Participents,addParticipents,deleteParticipents } from "../services/conversation.service.js";
 
 export const receiverRouter = Router();
 receiverRouter.get("/users/receivers", Participents)

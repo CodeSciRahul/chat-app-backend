@@ -7,6 +7,7 @@ import {
 } from "../../database/operations/index.js";
 export const Participents = async (req, res) => {
     const { userId } = req.user;
+    console.log("server triggered")
 
     try {
         const conversations = await findConversationsByUserIdWithPopulate(userId);

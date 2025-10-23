@@ -1,15 +1,15 @@
 import { io } from "../../../server.js";
 import { uploadFileToAws } from "../../util/uploadPicOnAws.js";
 import {
-    findMessagesBySenderAndReceiverWithPopulate,
+    fetchMessages,
     createMessage,
     findMessageByIdWithPopulate
-} from "../../database/operations/messageOperations.js";
+} from "../../database/operations/message.operation.js";
 // REST API for retrieving chat messages
 export const chatMessage = async(req,res) => {
     try {
-        const { sender, receiver } = req.params;
-        const messages = await findMessagesBySenderAndReceiverWithPopulate(sender, receiver);
+        const { sender, receiver, groupId } = req.query;
+        const messages = await fetchMessages(sender, receiver, groupId);
         res.status(200).json(messages);
     } catch (error) {
         res.status(500).send({ message: error.message });

@@ -5,5 +5,5 @@ import { Router } from "express";
 
 export const messageRouter = Router()
 
-messageRouter.get("/chats/:sender/:receiver", chatMessage)
+messageRouter.get("/chats", chatMessage)
 messageRouter.post("/upload", upload.single('file'), uploadDocument)

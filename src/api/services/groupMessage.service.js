@@ -1,5 +1,5 @@
-import { createMessage, findMessagesByGroupId } from "../../database/operations/messageOperations.js";
-import groupOperations from "../../database/operations/groupOperation.js";
+import { createMessage, findMessagesByGroupId, addReactionToMessage, removeReactionFromMessage, findMessageById, softDeleteMessageById } from "../../database/operations/message.operation.js";
+import * as groupOperations from "../../database/operations/group.operation.js";
 
 // Send Group Message
 export const sendGroupMessage = async (req, res) => {
@@ -153,7 +153,7 @@ export const deleteGroupMessage = async (req, res) => {
             });
         }
 
-        const deletedMessage = await deleteMessageById(messageId);
+        const deletedMessage = await softDeleteMessageById(messageId);
         
         return res.status(200).json({ 
             message: "Message deleted successfully", 

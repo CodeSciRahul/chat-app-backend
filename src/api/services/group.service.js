@@ -1,7 +1,6 @@
 import groupOperations from "../../database/operations/group.operation.js";
 import { findUserByEmailOrMobile } from "../../database/operations/user.operation.js";
 
-// Create Group
 export const createGroup = async (req, res) => {
     try {
         const { userId } = req.user;
@@ -11,7 +10,6 @@ export const createGroup = async (req, res) => {
             return res.status(400).json({ message: "Group name is required" });
         }
 
-        // Find users by email
         const memberUsers = [];
         for (const email of memberEmails) {
             const user = await findUserByEmailOrMobile(email, null);
@@ -23,8 +21,6 @@ export const createGroup = async (req, res) => {
                 });
             }
         }
-
-        // Add creator as admin
         const members = [
             {
                 user: userId,
