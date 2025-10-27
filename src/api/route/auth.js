@@ -1,4 +1,4 @@
-import { register,login, verifyEmail } from "../services/user.js";
+import { register,login, verifyEmail } from "../services/user.service.js";
 import { Router} from "express";
 
 export const authRoute = Router();
