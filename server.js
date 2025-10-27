@@ -74,6 +74,11 @@ io.on("connection", (socket) => {
     socket.join(room);
     console.log(`User joined room: ${room}`);
   });
+   // Leave room
+   socket.on("leave_room", ({ senderId, receiverId }) => {
+    socket.leave([senderId, receiverId].sort().join("_"));
+    console.log(`User ${senderId} left room: ${receiverId}`);
+  });
 
   // Join group room
   socket.on("join_group", ({ groupId, userId }) => {

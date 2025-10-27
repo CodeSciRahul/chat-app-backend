@@ -98,9 +98,33 @@ export const fetchMessages = async (sender, receiver, groupId) => {
 
 export const findMessageByIdWithPopulate = async (messageId) => {
     try {
-        return await Message.findById(messageId)
-            .populate("sender", "name email")
-            .populate("receiver", "name email");
+        let query = Message.findById(messageId)
+        .populate("sender", "name email")
+        .populate({
+          path: "replyTo",
+          populate: [
+            { path: "sender", select: "name email" },
+            { path: "receiver", select: "name email" },
+            { path: "groupId", select: "name" },
+            { path: "reactions.user", select: "name email" },
+          ],
+        })
+        .populate("reactions.user", "name email");
+      
+      // First fetch message to check which field exists
+      const msg = await Message.findById(messageId).lean();
+      
+      if (msg.receiver) {
+        query = query.populate("receiver", "name email");
+      }
+      
+      if (msg.groupId) {
+        query = query.populate("groupId", "name");
+      }
+      
+      const result = await query.exec();
+      return result;
+      
     } catch (error) {
         throw new Error(`Failed to find message by ID with populate: ${error.message}`);
     }

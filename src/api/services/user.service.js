@@ -93,6 +93,7 @@ export const verifyEmail = async (req, res) => {
 // Login User
 export const login = async (req, res) => {
     const { email, password } = req.body;
+    console.log("login request", email, password);
 
     try {
         // Validate input
