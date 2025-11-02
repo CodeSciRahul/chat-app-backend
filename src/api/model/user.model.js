@@ -2,8 +2,8 @@ import mongoose from 'mongoose';
 
 const userSchema = new mongoose.Schema({
   name: { type: String, required: true, trim: true },
-  email: { type: String, required: true, unique: true, trim: true },
-  mobile: { type: String, required: true, unique: true, trim: true },
+  email: { type: String, unique: true, trim: true, default: null },
+  mobile: { type: String, default: null, unique: true, trim: true },
   password: { type: String, required: true },
   isVerified: { type: Boolean, default: false }, // New field
   googleId: { type: String, default: null }, // For Google login

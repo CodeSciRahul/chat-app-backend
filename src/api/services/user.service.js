@@ -22,7 +22,7 @@ export const register = async (req, res) => {
 
     try {
         // Validate input
-        if (!(name && email && mobile && password)) {
+        if (!(name && (email || mobile) && password)) {
             return res.status(400).send({ message: "All fields are required" });
         }
 
@@ -43,12 +43,9 @@ export const register = async (req, res) => {
             isVerified: false
         });
 
-        // Send verification email
-        const emailResult = await sendEmail(email);
-
         // Respond with success message
         return res.status(201).send({
-            message: "Registration successful! A verification email has been sent to your email address.",
+            message: "Registration successful!",
             userId: savedUser._id,
         });
     } catch (error) {
@@ -57,6 +54,7 @@ export const register = async (req, res) => {
         });
     }
 };
+
 
 //verify Email
 export const verifyEmail = async (req, res) => {
