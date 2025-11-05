@@ -11,14 +11,15 @@ import {
     getGroupMembers,
     deleteGroup
 } from '../services/group.service.js';
+import { upload } from '../middlewares/handleFile.js';
 
 const router = express.Router();
 
 // Group CRUD operations
-router.post('/', createGroup);                    // Create new group
+router.post('/', upload.single('profilePicture'), createGroup);                    // Create new group
 router.get('/', getUserGroups);                   // Get user's groups
 router.get('/:groupId', getGroupDetails);         // Get group details
-router.put('/:groupId', updateGroup);             // Update group
+router.put('/:groupId', upload.single('profilePicture'), updateGroup);             // Update group
 router.delete('/:groupId', deleteGroup);          // Delete group
 
 // Member management

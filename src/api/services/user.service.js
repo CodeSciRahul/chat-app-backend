@@ -2,6 +2,7 @@ import jwt from "jsonwebtoken";
 import dotenv from "dotenv";
 import properties from "../../config/properties.js";
 import {sendEmail} from "../../util/sendEmail.js";
+import { uploadFileToAws } from "../../util/uploadPicOnAws.js";
 import {
     createUser,
     findUserByEmailOrMobile,
@@ -9,7 +10,8 @@ import {
     updateUserVerificationStatus,
     comparePassword,
     excludePasswordFromUser,
-    findAllUsers
+    findAllUsers,
+    updateUserById
 } from "../../database/operations/user.operation.js";
 
 dotenv.config();
@@ -147,5 +149,62 @@ export const allUsers = async (req, res) => {
     } catch (error) {
       console.error('Error fetching users:', error);
       res.status(500).json({ message: 'Internal Server Error' });
+    }
+};
+
+// Update User Profile
+export const updateProfile = async (req, res) => {
+    try {
+        const userId = req.user?.userId;
+        
+        if (!userId) {
+            return res.status(401).send({ message: "Unauthorized" });
+        }
+
+        // Get update data from request body
+        const { name, email, mobile } = req.body;
+        const file = req.file; // Get uploaded file from multer
+
+        // Build update object with only provided fields
+        const updateData = {};
+        if (name !== undefined) updateData.name = name;
+        if (email !== undefined) updateData.email = email;
+        if (mobile !== undefined) updateData.mobile = mobile;
+
+        if (email || mobile) {
+            const existingUser = await findUserByEmailOrMobile(email, mobile);
+            if (existingUser && existingUser._id.toString() !== userId) {
+                return res.status(400).send({
+                    message: "Email or Mobile number already registered by another user",
+                });
+            }
+        }
+
+        
+        // Handle profile picture upload
+        if (file) {
+            // Upload image to AWS S3
+            const fileName = file.originalname;
+            const fileType = file.mimetype;
+            const fileUrl = await uploadFileToAws(file.buffer, fileName, fileType);
+            updateData.profilePic = fileUrl;
+        }
+        const updatedUser = await updateUserById(userId, updateData);
+        
+        if (!updatedUser) {
+            return res.status(404).send({ message: "User not found" });
+        }
+
+        const userWithoutPassword = excludePasswordFromUser(updatedUser);
+
+        return res.status(200).send({
+            message: "Profile updated successfully",
+            user: userWithoutPassword,
+        });
+    } catch (error) {
+        console.error('Error updating profile:', error);
+        return res.status(500).send({
+            message: error?.message || "Internal Server Error",
+        });
     }
 };

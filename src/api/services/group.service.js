@@ -1,10 +1,12 @@
 import groupOperations from "../../database/operations/group.operation.js";
 import { findUserByEmailOrMobile } from "../../database/operations/user.operation.js";
+import { uploadFileToAws } from "../../util/uploadPicOnAws.js";
 
 export const createGroup = async (req, res) => {
     try {
         const { userId } = req.user;
-        const { name, description, profilePicture, memberEmails = [] } = req.body;
+        const { name, description, memberEmails = [] } = req.body;
+        const file = req.file; // Get uploaded file from multer
 
         if (!name) {
             return res.status(400).json({ message: "Group name is required" });
@@ -30,10 +32,19 @@ export const createGroup = async (req, res) => {
             ...memberUsers
         ];
 
+        // Handle profile picture upload
+        let profilePictureUrl;
+        if (file) {
+            // Upload image to AWS S3
+            const fileName = file.originalname;
+            const fileType = file.mimetype;
+            profilePictureUrl = await uploadFileToAws(file.buffer, fileName, fileType);
+        }
+
         const groupData = {
             name,
             description,
-            profilePicture,
+            profilePicture: profilePictureUrl,
             createdBy: userId,
             members
         };
@@ -108,7 +119,8 @@ export const updateGroup = async (req, res) => {
     try {
         const { groupId } = req.params;
         const { userId } = req.user;
-        const { name, description, profilePicture, settings } = req.body;
+        const { name, description, settings } = req.body;
+        const file = req.file; // Get uploaded file from multer
 
         // Check if user is admin
         const isAdmin = await groupOperations.isUserGroupAdmin(groupId, userId);
@@ -121,9 +133,16 @@ export const updateGroup = async (req, res) => {
         const updateData = {};
         if (name) updateData.name = name;
         if (description !== undefined) updateData.description = description;
-        if (profilePicture !== undefined) updateData.profilePicture = profilePicture;
         if (settings) updateData.settings = settings;
 
+        // Handle profile picture upload
+        if (file) {
+            // Upload image to AWS S3
+            const fileName = file.originalname;
+            const fileType = file.mimetype;
+            const fileUrl = await uploadFileToAws(file.buffer, fileName, fileType);
+            updateData.profilePicture = fileUrl;
+        }
         const group = await groupOperations.updateGroup(groupId, updateData);
         
         return res.status(200).json({ 
