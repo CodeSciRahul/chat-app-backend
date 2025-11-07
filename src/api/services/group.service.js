@@ -326,19 +326,27 @@ export const deleteGroup = async (req, res) => {
         const { groupId } = req.params;
         const { userId } = req.user;
 
-        // Check if user is admin
-        const isAdmin = await groupOperations.isUserGroupAdmin(groupId, userId);
-        if (!isAdmin) {
-            return res.status(403).json({ 
-                message: "Only admins can delete the group" 
+        // First, get the group to check the createdBy field
+        const group = await groupOperations.findGroupById(groupId);
+        if (!group) {
+            return res.status(404).json({ 
+                message: "Group not found" 
             });
         }
 
-        const group = await groupOperations.softDeleteGroup(groupId);
+        // Check if user is the creator of the group
+        if (group.createdBy._id.toString() !== userId) {
+            return res.status(403).json({ 
+                message: "Only the group creator can delete the group" 
+            });
+        }
+
+        // Soft delete the group
+        const deletedGroup = await groupOperations.softDeleteGroup(groupId);
         
         return res.status(200).json({ 
             message: "Group deleted successfully", 
-            group 
+            group: deletedGroup 
         });
     } catch (error) {
         return res.status(500).json({ 
