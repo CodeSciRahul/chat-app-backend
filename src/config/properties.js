@@ -14,7 +14,10 @@ const properties = {
     SALT_ROUND: Number(process.env.SALT_ROUND) || 10,
 
     SECERT_KEY: process.env.SECRET_KEY || "rahulkumar@1234",
-    EMAIL_VERIFICATION_SECERT_KEY: process.env.Email_Verification_Secret_key || "himanshinehakhushi@787007183"
+    EMAIL_VERIFICATION_SECERT_KEY: process.env.Email_Verification_Secret_key || "himanshinehakhushi@787007183",
+
+    YOUTUBE_API_KEY: process.env.YOUTUBE_API_KEY,
+    YOUTUBE_BASE_URL: process.env.YOUTUBE_BASE_URL
   };
   
   export default properties;

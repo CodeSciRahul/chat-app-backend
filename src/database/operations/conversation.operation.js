@@ -36,7 +36,7 @@ export const findConversationsByUserId = async (userId) => {
 export const findConversationsByUserIdWithPopulate = async (userId) => {
     try {
         return await Conversation.find({ userId })
-            .populate('participants', '_id name email mobile');
+            .populate('participants');
     } catch (error) {
         throw new Error(`Failed to find conversations with populate: ${error.message}`);
     }

@@ -25,7 +25,11 @@ import { messageRouter } from "./src/api/route/message.js";
 import { receiverRouter } from "./src/api/route/receiver.js";
 import { groupRouter } from "./src/api/route/group.js";
 import { groupMessageRouter } from "./src/api/route/groupMessage.js";
+import { errorHandler } from "./src/api/middlewares/errorHandle.middleware.js";
+import { musicRouter } from "./src/api/route/music.route.js";
 
+//util
+import { generateRoomId } from "./src/util/generateRoomId.util.js";
 dotenv.config();
 
 //connect DB
@@ -47,7 +51,6 @@ export const io = new Server(server, {
   maxHttpBufferSize: 1e8, // Increase the max buffer size for large files (100MB)
 });
 
-
 // Updated CORS configuration
 const corsOptions = {
   origin: "*", // Allow all origins
@@ -56,12 +59,17 @@ const corsOptions = {
 };
 
 app.use(cors(corsOptions));
+app.use(errorHandler)
 
 // Preflight requests handler
 app.options("*", cors(corsOptions)); // Handles preflight for all routes
 app.use(bodyParser.json());
 
 const port = Number(properties.PORT) || 5000;
+
+// In-memory "listen together" state per room.
+// NOTE: This resets when the server restarts (good enough for MVP).
+const musicRoomState = new Map(); // roomId -> { roomId, song, isPlaying, positionSec, updatedAtMs, action }
 
 app.get("/", async (req, res) => {
   return res.send(`<h1>Running backend on Port : ${port}</h1>`);
@@ -73,6 +81,11 @@ io.on("connection", (socket) => {
     const room = [senderId, receiverId].sort().join("_"); // Unique room name
     socket.join(room);
     console.log(`User joined room: ${room}`);
+
+    const state = musicRoomState.get(room);
+    if (state) {
+      socket.emit("music:state", state);
+    }
   });
    // Leave room
    socket.on("leave_room", ({ senderId, receiverId }) => {
@@ -92,7 +105,7 @@ io.on("connection", (socket) => {
     console.log(`User ${userId} left group: ${groupId}`);
   });
 
-  // Handle sending private messages
+  
   socket.on("send_message", async ({ senderId, receiverId, content, fileUrl, fileType, replyTo }) => {
     try {
       const room = [senderId, receiverId].sort().join("_");
@@ -207,6 +220,63 @@ io.on("connection", (socket) => {
   socket.on("disconnect", () => {
     console.log("User disconnected:", socket.id);
   });
+
+  const upsertAndBroadcastMusicState = (roomId, patch) => {
+    const prev = musicRoomState.get(roomId) || {
+      roomId,
+      song: null,
+      isPlaying: false,
+      positionSec: 0,
+      updatedAtMs: Date.now(),
+      action: "select",
+    };
+
+    const next = {
+      ...prev,
+      ...patch,
+      roomId,
+      updatedAtMs: Date.now(),
+    };
+
+    musicRoomState.set(roomId, next);
+    io.to(roomId).emit("music:state", next);
+  };
+
+  socket.on("music:select", ({ senderId, receiverId, song }) => {
+    const roomId = generateRoomId(senderId, receiverId);
+    upsertAndBroadcastMusicState(roomId, {
+      song,
+      isPlaying: true,
+      positionSec: 0,
+      action: "select",
+    });
+  });
+
+  socket.on("music:play", ({ senderId, receiverId, positionSec = 0 }) => {
+    const roomId = generateRoomId(senderId, receiverId);
+    upsertAndBroadcastMusicState(roomId, {
+      isPlaying: true,
+      positionSec: Number(positionSec) || 0,
+      action: "play",
+    });
+  });
+
+  socket.on("music:pause", ({ senderId, receiverId, positionSec = 0 }) => {
+    const roomId = generateRoomId(senderId, receiverId);
+    upsertAndBroadcastMusicState(roomId, {
+      isPlaying: false,
+      positionSec: Number(positionSec) || 0,
+      action: "pause",
+    });
+  });
+
+  socket.on("music:seek", ({ senderId, receiverId, positionSec = 0 }) => {
+    const roomId = generateRoomId(senderId, receiverId);
+    upsertAndBroadcastMusicState(roomId, {
+      positionSec: Number(positionSec) || 0,
+      action: "seek",
+    });
+  });
 });
 
 //route
@@ -215,6 +285,7 @@ app.use("/api", protectRoute, messageRouter);
 app.use("/api", receiverRouter);
 app.use("/api/groups", protectRoute, groupRouter);
 app.use("/api/groups", protectRoute, groupMessageRouter);
+app.use("/api/music", musicRouter)
 
 // Use server.listen for both HTTP and WebSocket on the same port
 server.listen(port, () => {
