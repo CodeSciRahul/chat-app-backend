@@ -36,7 +36,16 @@ export const findConversationsByUserId = async (userId) => {
 export const findConversationsByUserIdWithPopulate = async (userId) => {
     try {
         return await Conversation.find({ userId })
-            .populate('participants', '_id name email mobile');
+            .populate('participants')
+            .populate({
+                path: "last_message",
+                select: "content fileUrl fileType sender receiver groupId messageType createdAt",
+                populate: [
+                    { path: "sender", select: "name email" },
+                    { path: "receiver", select: "name email" },
+                    { path: "groupId", select: "name" }
+                ]
+            });
     } catch (error) {
         throw new Error(`Failed to find conversations with populate: ${error.message}`);
     }
@@ -50,6 +59,21 @@ export const findConversationByUserIdAndParticipant = async (userId, participant
         });
     } catch (error) {
         throw new Error(`Failed to find conversation by user and participant: ${error.message}`);
+    }
+};
+
+export const upsertConversationLastMessage = async (userId, participantId, messageId) => {
+    try {
+        return await Conversation.findOneAndUpdate(
+            { userId, participants: participantId },
+            {
+                $set: { last_message: messageId },
+                $setOnInsert: { userId, participants: [participantId] }
+            },
+            { new: true, upsert: true }
+        );
+    } catch (error) {
+        throw new Error(`Failed to upsert conversation last message: ${error.message}`);
     }
 };
 

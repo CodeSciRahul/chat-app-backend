@@ -155,6 +155,30 @@ export const updateMessageById = async (messageId, updateData) => {
     }
 };
 
+export const markMessageDelivered = async (messageId, deliveredAt = new Date()) => {
+    try {
+        return await Message.findOneAndUpdate(
+            { _id: messageId, deliveredAt: null },
+            { $set: { deliveredAt } },
+            { new: true }
+        );
+    } catch (error) {
+        throw new Error(`Failed to mark message delivered: ${error.message}`);
+    }
+};
+
+export const markMessagesSeen = async ({ messageIds, viewerId, seenAt = new Date() }) => {
+    try {
+        if (!Array.isArray(messageIds) || messageIds.length === 0) return { modifiedCount: 0 };
+        return await Message.updateMany(
+            { _id: { $in: messageIds }, receiver: viewerId, seenAt: null },
+            { $set: { seenAt } }
+        );
+    } catch (error) {
+        throw new Error(`Failed to mark messages seen: ${error.message}`);
+    }
+};
+
 export const updateMessageContent = async (messageId, content) => {
     try {
         return await Message.findByIdAndUpdate(

@@ -15,9 +15,21 @@ export const Participents = async (req, res) => {
             return res.status(404).json({ message: 'No conversations found' });
         }
 
-        const receivers = conversations.flatMap(conversation =>
-            conversation.participants.filter(participant => participant._id.toString() !== userId)
-        );
+        const receiversMap = new Map();
+        for (const conversation of conversations) {
+            const participant = (conversation.participants || []).find(
+                (p) => p?._id?.toString() !== userId
+            );
+            if (!participant?._id) continue;
+
+            const lastMessage = conversation.last_message || null;
+            receiversMap.set(participant._id.toString(), {
+                ...participant.toObject?.() ?? participant,
+                lastMessage
+            });
+        }
+
+        const receivers = Array.from(receiversMap.values());
 
         res.status(200).json({ receivers });
     } catch (error) {
