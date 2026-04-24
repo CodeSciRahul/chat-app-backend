@@ -41,7 +41,9 @@ const messageSchema = new mongoose.Schema({
     deleted: {
         type: Boolean,
         default: false
-    }
+    },
+    deliveredAt: { type: Date, default: null },
+    seenAt: { type: Date, default: null }
 }, { timestamps: true });
 
 export default mongoose.model('Message', messageSchema);

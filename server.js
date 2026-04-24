@@ -12,11 +12,14 @@ import {
   createMessage, 
   findMessageByIdWithPopulate, 
   addReactionToMessage,
-  removeReactionFromMessage
+  removeReactionFromMessage,
+  markMessageDelivered,
+  markMessagesSeen
 } from "./src/database/operations/message.operation.js";
 import { 
   createConversation, 
-  findConversationByUserIdAndParticipant 
+  findConversationByUserIdAndParticipant,
+  upsertConversationLastMessage
 } from "./src/database/operations/conversation.operation.js";
 
 //different route
@@ -71,11 +74,38 @@ const port = Number(properties.PORT) || 5000;
 // NOTE: This resets when the server restarts (good enough for MVP).
 const musicRoomState = new Map(); // roomId -> { roomId, song, isPlaying, positionSec, updatedAtMs, action }
 
+// In-memory presence state (userId -> Set<socketId>)
+const onlineUsers = new Map();
+
 app.get("/", async (req, res) => {
   return res.send(`<h1>Running backend on Port : ${port}</h1>`);
 });
 
 io.on("connection", (socket) => {
+  // Presence: mark online and broadcast.
+  socket.on("presence:online", ({ userId }) => {
+    if (!userId) return;
+
+    socket.data.userId = String(userId);
+    const id = String(userId);
+    const set = onlineUsers.get(id) || new Set();
+    const wasOnline = set.size > 0;
+    set.add(socket.id);
+    onlineUsers.set(id, set);
+
+    if (!wasOnline) {
+      io.emit("presence:update", { userId: id, online: true });
+    }
+  });
+
+  // Presence: allow clients to fetch initial list.
+  socket.on("presence:get", () => {
+    const ids = Array.from(onlineUsers.entries())
+      .filter(([_, sockets]) => sockets && sockets.size > 0)
+      .map(([userId]) => userId);
+    socket.emit("presence:list", { onlineUserIds: ids });
+  });
+
   // Join private room for two users
   socket.on("join_room", ({ senderId, receiverId }) => {
     const room = [senderId, receiverId].sort().join("_"); // Unique room name
@@ -106,7 +136,7 @@ io.on("connection", (socket) => {
   });
 
   
-  socket.on("send_message", async ({ senderId, receiverId, content, fileUrl, fileType, replyTo }) => {
+  socket.on("send_message", async ({ senderId, receiverId, content, fileUrl, fileType, replyTo, clientMessageId }) => {
     try {
       const room = [senderId, receiverId].sort().join("_");
 
@@ -125,6 +155,11 @@ io.on("connection", (socket) => {
 
       // Populate sender and receiver details
       const populatedMessage = await findMessageByIdWithPopulate(newMessage._id);
+      // Attach clientMessageId so sender can replace optimistic message
+      const emittedMessage = {
+        ...(populatedMessage?.toObject?.() ?? populatedMessage),
+        clientMessageId: clientMessageId || null,
+      };
 
       // Check if a conversation already exists using database operations
       let conversation = await findConversationByUserIdAndParticipant(senderId, receiverId);
@@ -135,11 +170,48 @@ io.on("connection", (socket) => {
         });
       }
 
+      // Keep last message updated for BOTH users' conversation lists
+      await Promise.all([
+        upsertConversationLastMessage(senderId, receiverId, newMessage._id),
+        upsertConversationLastMessage(receiverId, senderId, newMessage._id),
+      ]);
+
       // Emit the message to the room
-      io.to(room).emit("receive_message", populatedMessage);
+      io.to(room).emit("receive_message", emittedMessage);
+
+      // Mark delivered if receiver is online (at least one socket)
+      const receiverSockets = onlineUsers.get(String(receiverId));
+      if (receiverSockets && receiverSockets.size > 0) {
+        const updated = await markMessageDelivered(newMessage._id);
+        if (updated?.deliveredAt) {
+          io.to(room).emit("message:status", {
+            messageId: String(newMessage._id),
+            deliveredAt: updated.deliveredAt,
+            seenAt: updated.seenAt || null,
+          });
+        }
+      }
     } catch (error) {
       console.error("Error sending private message:", error);
       socket.emit("error", { message: "Failed to send message" });
+    }
+  });
+
+  // Seen receipts (private chat)
+  socket.on("message:seen", async ({ messageIds, viewerId, otherUserId }) => {
+    try {
+      if (!Array.isArray(messageIds) || messageIds.length === 0) return;
+      if (!viewerId || !otherUserId) return;
+
+      await markMessagesSeen({ messageIds, viewerId });
+
+      const room = [viewerId, otherUserId].sort().join("_");
+      io.to(room).emit("message:status", {
+        messageIds: messageIds.map(String),
+        seenAt: new Date(),
+      });
+    } catch (error) {
+      console.error("Error marking messages seen:", error);
     }
   });
 
@@ -218,6 +290,19 @@ io.on("connection", (socket) => {
   });
 
   socket.on("disconnect", () => {
+    const id = socket.data?.userId ? String(socket.data.userId) : null;
+    if (id) {
+      const set = onlineUsers.get(id);
+      if (set) {
+        set.delete(socket.id);
+        if (set.size === 0) {
+          onlineUsers.delete(id);
+          io.emit("presence:update", { userId: id, online: false });
+        } else {
+          onlineUsers.set(id, set);
+        }
+      }
+    }
     console.log("User disconnected:", socket.id);
   });
 
@@ -244,6 +329,7 @@ io.on("connection", (socket) => {
 
   socket.on("music:select", ({ senderId, receiverId, song }) => {
     const roomId = generateRoomId(senderId, receiverId);
+    console.log("music:select", roomId)
     upsertAndBroadcastMusicState(roomId, {
       song,
       isPlaying: true,
@@ -254,6 +340,7 @@ io.on("connection", (socket) => {
 
   socket.on("music:play", ({ senderId, receiverId, positionSec = 0 }) => {
     const roomId = generateRoomId(senderId, receiverId);
+    console.log("music:play", roomId)
     upsertAndBroadcastMusicState(roomId, {
       isPlaying: true,
       positionSec: Number(positionSec) || 0,
@@ -263,6 +350,7 @@ io.on("connection", (socket) => {
 
   socket.on("music:pause", ({ senderId, receiverId, positionSec = 0 }) => {
     const roomId = generateRoomId(senderId, receiverId);
+    console.log("music:pause", roomId)
     upsertAndBroadcastMusicState(roomId, {
       isPlaying: false,
       positionSec: Number(positionSec) || 0,
@@ -272,6 +360,7 @@ io.on("connection", (socket) => {
 
   socket.on("music:seek", ({ senderId, receiverId, positionSec = 0 }) => {
     const roomId = generateRoomId(senderId, receiverId);
+    console.log("music:seek", roomId)
     upsertAndBroadcastMusicState(roomId, {
       positionSec: Number(positionSec) || 0,
       action: "seek",
