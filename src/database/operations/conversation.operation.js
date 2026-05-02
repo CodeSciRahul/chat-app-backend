@@ -45,7 +45,7 @@ export const findConversationsByUserIdWithPopulate = async (userId) => {
                     { path: "receiver", select: "name email" },
                     { path: "groupId", select: "name" }
                 ]
-            });
+            }).sort({ updatedAt: -1 });
     } catch (error) {
         throw new Error(`Failed to find conversations with populate: ${error.message}`);
     }
@@ -99,7 +99,7 @@ export const addParticipantToConversation = async (userId, participantId) => {
         return await Conversation.findOneAndUpdate(
             { userId },
             { $addToSet: { participants: participantId } },
-            { new: true, upsert: true }
+            // { new: true, upsert: true }
         );
     } catch (error) {
         throw new Error(`Failed to add participant to conversation: ${error.message}`);

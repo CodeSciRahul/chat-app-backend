@@ -3,7 +3,7 @@ import {
     findUserByEmailOrMobile,
     findConversationByUserIdAndParticipant,
     createConversation,
-    removeParticipantFromConversation
+    deleteConversationByUserIdAndParticipant
 } from "../../database/operations/index.js";
 export const Participents = async (req, res) => {
     const { userId } = req.user;
@@ -68,13 +68,13 @@ export const deleteParticipents = async (req, res) => {
     const {userId} = req.user
 
     try {
-        const conversation = await removeParticipantFromConversation(userId, receiverId);
+        const conversation = await deleteConversationByUserIdAndParticipant(userId, receiverId);
 
         if (!conversation) {
             return res.status(404).json({ message: 'Conversation not found' });
         }
 
-        res.status(200).json({ message: 'Receiver removed successfully', conversation });
+        res.status(200).json({ message: 'Conversation deleted successfully', conversation });
     } catch (error) {
         console.error(error);
         res.status(500).json({ message: 'Internal server error' });

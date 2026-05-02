@@ -14,13 +14,16 @@ import {
   addReactionToMessage,
   removeReactionFromMessage,
   markMessageDelivered,
-  markMessagesSeen
+  markMessagesSeen,
+  findMessageById,
+  softDeleteMessageById
 } from "./src/database/operations/message.operation.js";
 import { 
   createConversation, 
   findConversationByUserIdAndParticipant,
   upsertConversationLastMessage
 } from "./src/database/operations/conversation.operation.js";
+import groupOperations from "./src/database/operations/group.operation.js";
 
 //different route
 import { authRoute } from "./src/api/route/auth.js";
@@ -279,6 +282,38 @@ io.on("connection", (socket) => {
     }
   );
 
+  // Soft delete message (private + group)
+  socket.on("message:delete", async ({ messageId, requesterId }) => {
+    try {
+      if (!messageId || !requesterId) return;
+
+      const message = await findMessageById(messageId);
+      if (!message) return;
+
+      const msgType = String(message.messageType || "private");
+
+      if (msgType === "group") {
+        const groupId = String(message.groupId || "");
+        const isAdmin = groupId ? await groupOperations.isUserGroupAdmin(groupId, String(requesterId)) : false;
+        const isSender = String(message.sender) === String(requesterId);
+        if (!isAdmin && !isSender) return;
+
+        await softDeleteMessageById(messageId);
+        io.to(`group_${groupId}`).emit("message:deleted", { messageId: String(messageId) });
+        return;
+      }
+
+      // private
+      if (String(message.sender) !== String(requesterId)) return;
+
+      await softDeleteMessageById(messageId);
+      const room = [String(message.sender), String(message.receiver)].sort().join("_");
+      io.to(room).emit("message:deleted", { messageId: String(messageId) });
+    } catch (error) {
+      console.error("Error deleting message:", error);
+    }
+  });
+
   // Handle member added to group
   socket.on("group_member_added", ({ groupId, newMember }) => {
     io.to(`group_${groupId}`).emit("member_added", { groupId, newMember });
@@ -371,7 +406,7 @@ io.on("connection", (socket) => {
 //route
 app.use("/api", authRoute);
 app.use("/api", protectRoute, messageRouter);
-app.use("/api", receiverRouter);
+app.use("/api", protectRoute, receiverRouter);
 app.use("/api/groups", protectRoute, groupRouter);
 app.use("/api/groups", protectRoute, groupMessageRouter);
 app.use("/api/music", musicRouter)
