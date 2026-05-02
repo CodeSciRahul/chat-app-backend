@@ -194,7 +194,21 @@ export const updateMessageContent = async (messageId, content) => {
 // DELETE operations
 export const softDeleteMessageById = async (messageId) => {
     try {
-        return await Message.findByIdAndUpdate(messageId, { deleted: true }, { new: true });
+        return await Message.findByIdAndUpdate(
+            messageId,
+            {
+                $set: {
+                    deleted: true,
+                    content: "",
+                    fileUrl: null,
+                    fileType: null
+                },
+                $unset: {
+                    reactions: 1
+                }
+            },
+            { new: true }
+        );
     } catch (error) {
         throw new Error(`Failed to delete message: ${error.message}`);
     }
