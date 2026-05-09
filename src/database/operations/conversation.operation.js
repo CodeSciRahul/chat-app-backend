@@ -1,5 +1,5 @@
 import Conversation from "../../api/model/conversation.model.js";
-
+import mongoose from "mongoose";
 // CREATE operations
 export const createConversation = async (conversationData) => {
     try {
@@ -156,4 +156,29 @@ export const deleteConversationByUserIdAndParticipant = async (userId, participa
     } catch (error) {
         throw new Error(`Failed to delete conversation by user and participant: ${error.message}`);
     }
+};
+
+export const deleteConversationsByConversationIds = async (conversationIds) => {
+
+    console.log("conversationIds", conversationIds);
+
+    const objectIds = conversationIds.map(
+        id => new mongoose.Types.ObjectId(String(id))
+    );
+
+    console.log("objectIds", objectIds);
+
+    const existing = await Conversation.find({
+        _id: { $in: objectIds }
+    });
+
+    console.log("existing", existing);
+
+    const conversations = await Conversation.deleteMany({
+        _id: { $in: objectIds }
+    });
+
+    console.log("deleted result", conversations);
+
+    return conversations;
 };

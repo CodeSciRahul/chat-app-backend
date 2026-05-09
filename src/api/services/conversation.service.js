@@ -3,8 +3,11 @@ import {
     findUserByEmailOrMobile,
     findConversationByUserIdAndParticipant,
     createConversation,
-    deleteConversationByUserIdAndParticipant
+    deleteConversationByUserIdAndParticipant,
+    deleteConversationsByConversationIds
 } from "../../database/operations/index.js";
+import {asyncHandler} from "../../util/asyncHandler.util.js"
+import {ApiResponse} from "../../util/apiResponse.util.js"
 export const Participents = async (req, res) => {
     const { userId } = req.user;
     console.log("server triggered")
@@ -25,6 +28,7 @@ export const Participents = async (req, res) => {
             const lastMessage = conversation.last_message || null;
             receiversMap.set(participant._id.toString(), {
                 ...participant.toObject?.() ?? participant,
+                conversationId: conversation._id,
                 lastMessage
             });
         }
@@ -80,3 +84,13 @@ export const deleteParticipents = async (req, res) => {
         res.status(500).json({ message: 'Internal server error' });
     }
 }
+
+export const deleteMultipleParticipents = asyncHandler( async (req, res) => {
+    const {conversationIds} = req.body
+
+    const conversations = await deleteConversationsByConversationIds(conversationIds)
+    if (!conversations) {
+        return ApiResponse(res, 404, "Conversations not found")
+    }
+    return ApiResponse(res, 200, "Conversations deleted successfully", conversations)
+})
